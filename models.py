@@ -1,9 +1,20 @@
+import sys
 from abc import ABC, abstractmethod
-from gigachat import GigaChat
+
 import httpx
 import urllib3
+from gigachat import GigaChat
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def _short(message: str, limit: int = 300) -> str:
+    return message if len(message) <= limit else message[:limit] + "..."
+
+
+def log_error(model: str, message: str) -> None:
+    """Печатает ошибку запроса в консоль сразу, а не только в итоговой таблице."""
+    print(f"[ОШИБКА] {model}: {_short(message)}", file=sys.stderr, flush=True)
 
 
 class BaseLLM(ABC):
@@ -35,7 +46,8 @@ class GigaChatModel(BaseLLM):
                 res = cl.chat(full_prompt)
                 return res.choices[0].message.content
         except Exception as e:
-            return f"[Ошибка GigaChat API]: {str(e)}"
+            log_error("GigaChat", f"{type(e).__name__}: {e}")
+            return f"[Ошибка GigaChat API]: {_short(f'{type(e).__name__}: {e}')}"
 
 
 class DeepSeekModel(BaseLLM):
@@ -72,6 +84,8 @@ class DeepSeekModel(BaseLLM):
                 if response.status_code == 200:
                     return response.json()["choices"][0]["message"]["content"]
                 else:
-                    return f"[Ошибка DeepSeek API {response.status_code}]: {response.text}"
+                    log_error("DeepSeek", f"HTTP {response.status_code}: {response.text}")
+                    return f"[Ошибка DeepSeek API {response.status_code}]: {_short(response.text)}"
         except Exception as e:
-            return f"[Ошибка сети DeepSeek]: {str(e)}"
+            log_error("DeepSeek", f"{type(e).__name__}: {e}")
+            return f"[Ошибка сети DeepSeek]: {_short(f'{type(e).__name__}: {e}')}"
