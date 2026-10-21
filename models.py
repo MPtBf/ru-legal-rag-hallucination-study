@@ -14,6 +14,10 @@ class BaseLLM(ABC):
 
 class GigaChatModel(BaseLLM):
     def __init__(self, auth_key: str):
+        if not auth_key:
+            raise ValueError(
+                "Не задан GIGACHAT_AUTH_KEY. Скопируй .env.example в .env и заполни ключ."
+            )
         self.auth_key = auth_key
 
     def generate_response(self, prompt: str, system_prompt: str = "") -> str:
@@ -36,6 +40,10 @@ class GigaChatModel(BaseLLM):
 
 class DeepSeekModel(BaseLLM):
     def __init__(self, api_key: str):
+        if not api_key:
+            raise ValueError(
+                "Не задан DEEPSEEK_API_KEY. Скопируй .env.example в .env и заполни ключ."
+            )
         self.api_key = api_key
         self.url = "https://deepseek.com"
 
