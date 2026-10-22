@@ -115,7 +115,7 @@ def main() -> None:
     pipeline = pipeline_cls(model=args.model)
     answer_col = pipeline.answer_col
 
-    # results/{mode}/{model}/{mode}_{model}_{date}_v{prompt_version}.xlsx
+    # --output-path (для тестов) или results/{mode}/{model}/{mode}_{model}_{prompt_version}.xlsx
     if args.output_path is not None:
         out_path = args.output_path
         out_path.parent.mkdir(parents=True, exist_ok=True)
