@@ -93,6 +93,8 @@ class GigaChatModel(BaseLLM):
         self.auth_key = auth_key
         # Фактическая модель из последнего ответа (например, "GigaChat-2:2.0.30.01").
         self.last_model = None
+        # У GigaChat аналога system_fingerprint нет.
+        self.last_fingerprint = None
         # Клиент переиспользуется между запросами: иначе на каждую попытку
         # уходил бы лишний OAuth-запрос. Токен SDK обновляет сам.
         # max_retries=0: повторами управляет _call_with_retries, а не SDK.
@@ -136,6 +138,8 @@ class DeepSeekModel(BaseLLM):
         self.url = config.DEEPSEEK_URL
         # Фактическая модель из последнего ответа (например, "deepseek-flash").
         self.last_model = None
+        # Отпечаток конфигурации бэкенда: меняется при обновлении весов/настроек.
+        self.last_fingerprint = None
 
     def generate_response(self, prompt: str, system_prompt: str = "") -> str:
         messages = []
@@ -170,6 +174,7 @@ class DeepSeekModel(BaseLLM):
                 if not choices:
                     raise EmptyResponseError("DeepSeek: пустой список choices")
                 self.last_model = data.get("model")
+                self.last_fingerprint = data.get("system_fingerprint")
                 return _require_text("DeepSeek", choices[0].get("message", {}).get("content"))
 
         return _call_with_retries("DeepSeek", request)

@@ -24,4 +24,10 @@ class ZeroShotPipeline:
     def answer(self, question: str) -> Answer:
         # Вызов модели сохраняем как в исходных скриптах: промпт и та же инструкция.
         text = self.llm.generate_response(prompt=question, system_prompt=prompts.SYSTEM_PROMPT)
-        return Answer(text=text, meta={"response_model": self.llm.last_model})
+        return Answer(
+            text=text,
+            meta={
+                "response_model": self.llm.last_model,
+                "system_fingerprint": self.llm.last_fingerprint,
+            },
+        )
