@@ -28,13 +28,24 @@ class LLMRequestError(RuntimeError):
         )
 
 
+class EmptyResponseError(RuntimeError):
+    """Модель вернула пустой ответ (None или строка из пробелов)."""
+
+
+def _require_text(model: str, text) -> str:
+    """Пустой ответ считаем сбоем, иначе он молча попадёт в таблицу."""
+    if text is None or not str(text).strip():
+        raise EmptyResponseError(f"{model}: пустой ответ модели")
+    return str(text)
+
+
 def _short(message: str, limit: int = 300) -> str:
     return message if len(message) <= limit else message[:limit] + "..."
 
 
 def _is_retryable(error: Exception) -> bool:
     """Повторяем только временные сбои: сеть, таймауты, 429 и 5xx."""
-    if isinstance(error, (RateLimitError, ServerError)):
+    if isinstance(error, (RateLimitError, ServerError, EmptyResponseError)):
         return True
     if isinstance(error, httpx.HTTPStatusError):
         status = error.response.status_code
@@ -99,7 +110,9 @@ class GigaChatModel(BaseLLM):
                         temperature=config.TEMPERATURE,
                     )
                 )
-                return res.choices[0].message.content
+                if not res.choices:
+                    raise EmptyResponseError("GigaChat: пустой список choices")
+                return _require_text("GigaChat", res.choices[0].message.content)
 
         return _call_with_retries("GigaChat", request)
 
@@ -141,6 +154,10 @@ class DeepSeekModel(BaseLLM):
                         request=response.request,
                         response=response,
                     )
-                return response.json()["choices"][0]["message"]["content"]
+                data = response.json()
+                choices = data.get("choices") or []
+                if not choices:
+                    raise EmptyResponseError("DeepSeek: пустой список choices")
+                return _require_text("DeepSeek", choices[0].get("message", {}).get("content"))
 
         return _call_with_retries("DeepSeek", request)
