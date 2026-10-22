@@ -12,16 +12,14 @@ class ZeroShotPipeline:
     ANSWER_PREFIX = "Ответ"
 
     def __init__(self, model: str):
+        if model not in config.MODEL_LABELS:
+            raise ValueError(f"Неизвестная модель: {model}")
         if model == "gigachat":
             self.llm = GigaChatModel(auth_key=config.GIGACHAT_AUTH_KEY)
-            label = "GigaChat"
-        elif model == "deepseek":
-            self.llm = DeepSeekModel(api_key=config.DEEPSEEK_API_KEY)
-            label = "DeepSeek"
         else:
-            raise ValueError(f"Неизвестная модель: {model}")
+            self.llm = DeepSeekModel(api_key=config.DEEPSEEK_API_KEY)
         self.model = model
-        self.answer_col = f"{self.ANSWER_PREFIX}_{label}_ZeroShot"
+        self.answer_col = f"{self.ANSWER_PREFIX}_{config.MODEL_LABELS[model]}_ZeroShot"
 
     def answer(self, question: str) -> Answer:
         # Вызов модели сохраняем как в исходных скриптах: промпт и та же инструкция.

@@ -20,6 +20,9 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 GIGACHAT_MODEL = "GigaChat-2"
 DEEPSEEK_MODEL = "deepseek-chat"
 
+# Короткое имя для CLI и подпись в колонках результатов
+MODEL_LABELS = {"gigachat": "GigaChat", "deepseek": "DeepSeek"}
+
 # Параметры генерации
 TEMPERATURE = 0.1
 

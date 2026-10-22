@@ -96,7 +96,7 @@ def positive_int(value: str) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Единый раннер RAG-экспериментов")
     parser.add_argument("--mode", required=True, choices=sorted(PIPELINES), help="режим эксперимента")
-    parser.add_argument("--model", required=True, choices=["gigachat", "deepseek"], help="модель")
+    parser.add_argument("--model", required=True, choices=sorted(config.MODEL_LABELS), help="модель")
     parser.add_argument("--limit", type=positive_int, default=None, help="обработать только первые N вопросов (для тестов)")
     parser.add_argument("--output-path", type=Path, default=None, help="свой путь к файлу результатов (для тестов)")
     args = parser.parse_args()
