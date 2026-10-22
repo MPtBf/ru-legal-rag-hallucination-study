@@ -41,6 +41,28 @@ def read_or_create(source_df: pd.DataFrame, out_path: Path, answer_col: str) -> 
     return results_df
 
 
+def align_ids(source_df: pd.DataFrame, results_df: pd.DataFrame) -> int:
+    """Проставляет № из датасета строкам результатов по тексту вопроса.
+
+    Нумерация в датасете менялась (часть номеров сдвинулась, часть добавилась),
+    поэтому № в старых файлах результатов мог разойтись с актуальным датасетом.
+    """
+    if ID_COL not in results_df.columns:
+        return 0
+
+    ids_by_question = {}
+    for _, row in source_df.iterrows():
+        ids_by_question.setdefault(norm_question(row[QUESTION_COL]), row[ID_COL])
+
+    changed = 0
+    for pos, q_text in enumerate(results_df[QUESTION_COL]):
+        new_id = ids_by_question.get(norm_question(q_text))
+        if new_id is not None and str(results_df.at[pos, ID_COL]).strip() != str(new_id).strip():
+            results_df.at[pos, ID_COL] = new_id
+            changed += 1
+    return changed
+
+
 def save_metadata(out_path: Path, meta: Dict[str, Any]) -> None:
     # results/{mode}/{model}/{stem}_metadata.json рядом с таблицей результатов.
     meta_path = out_path.with_name(out_path.stem + "_metadata.json")
@@ -102,6 +124,13 @@ def main() -> None:
     for col in MARKUP_COLUMNS:
         if col not in results_df.columns:
             results_df[col] = ""
+
+    # № мог измениться в датасете - синхронизируем и сразу сохраняем правки.
+    fixed_ids = align_ids(source_df, results_df)
+    if fixed_ids:
+        results_df.to_excel(out_path, index=False)
+        logger.info("Синхронизировано № по датасету: %d", fixed_ids)
+        print(f"Синхронизировано № по датасету: {fixed_ids}")
 
     index_by_question = {}
     for pos, q_text in enumerate(results_df[QUESTION_COL]):
