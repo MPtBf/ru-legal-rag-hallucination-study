@@ -1,8 +1,11 @@
 import argparse
+import hashlib
 import json
 import logging
+import os
+import subprocess
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
@@ -18,6 +21,16 @@ logger = logging.getLogger(__name__)
 ID_COL = "№"
 QUESTION_COL = "Вопрос"
 MARKUP_COLUMNS = ["Была галлюцинация (да/нет)", "Комментарий"]
+
+# Условия, при расхождении с метаданными прогон останавливается:
+# ответы в одном файле должны быть получены в одинаковых условиях.
+CONDITION_FIELDS = [
+    "requested_model",
+    "system_prompt",
+    "prompt_version",
+    "temperature",
+    "answer_column",
+]
 
 
 def norm_question(value: Any) -> str:
@@ -63,11 +76,84 @@ def align_ids(source_df: pd.DataFrame, results_df: pd.DataFrame) -> int:
     return changed
 
 
-def save_metadata(out_path: Path, meta: Dict[str, Any]) -> None:
-    # results/{mode}/{model}/{stem}_metadata.json рядом с таблицей результатов.
-    meta_path = out_path.with_name(out_path.stem + "_metadata.json")
-    with open(meta_path, "w", encoding="utf-8") as f:
+def metadata_path(out_path: Path) -> Path:
+    return out_path.with_name(out_path.stem + "_metadata.json")
+
+
+def write_metadata(out_path: Path, meta: Dict[str, Any]) -> None:
+    """Атомарная запись: обрыв не оставит битый JSON."""
+    meta_path = metadata_path(out_path)
+    tmp_path = meta_path.with_name(meta_path.name + ".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, meta_path)
+
+
+def read_metadata(out_path: Path) -> Dict[str, Any] | None:
+    meta_path = metadata_path(out_path)
+    if not meta_path.exists():
+        return None
+    try:
+        with open(meta_path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        # Битый JSON считаем отсутствием метаданных: проверять условия нельзя.
+        return None
+
+
+def dataset_sha256() -> str:
+    digest = hashlib.sha256()
+    with open(config.DATASET_PATH, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def git_state() -> tuple[str | None, bool | None]:
+    """Коммит и признак незакоммиченных правок: без них git_commit врёт."""
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain"], capture_output=True, text=True, check=True
+            ).stdout.strip()
+        )
+        return commit, dirty
+    except (OSError, subprocess.CalledProcessError):
+        return None, None
+
+
+def _preview(value: Any, limit: int = 80) -> str:
+    text = str(value)
+    return text if len(text) <= limit else text[:limit] + "..."
+
+
+def check_conditions(existing: Dict[str, Any], current: Dict[str, Any]) -> list[str]:
+    """Расхождения в условиях, при которых ответы в файле несравнимы."""
+    diffs = []
+    for key in CONDITION_FIELDS:
+        old = existing.get(key)
+        new = current.get(key)
+        if old != new:
+            diffs.append(f"{key}: {_preview(old)} -> {_preview(new)}")
+    return diffs
+
+
+def add_usage(total: Dict[str, int], usage: Any) -> None:
+    if not isinstance(usage, dict):
+        return
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        value = usage.get(key)
+        if isinstance(value, int):
+            total[key] = total.get(key, 0) + value
+
+
+def clear_answers(results_df: pd.DataFrame, answer_col: str) -> None:
+    results_df[answer_col] = ""
+    for col in MARKUP_COLUMNS:
+        results_df[col] = ""
 
 
 def setup_logging(mode: str, model: str, date_str: str) -> Path:
@@ -99,6 +185,11 @@ def main() -> None:
     parser.add_argument("--model", required=True, choices=sorted(config.MODEL_LABELS), help="модель")
     parser.add_argument("--limit", type=positive_int, default=None, help="обработать только первые N вопросов (для тестов)")
     parser.add_argument("--output-path", type=Path, default=None, help="свой путь к файлу результатов (для тестов)")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="очистить ответы и перегенерировать всё заново, игнорируя прошлые условия",
+    )
     args = parser.parse_args()
 
     if args.output_path is not None:
@@ -147,14 +238,88 @@ def main() -> None:
         logger.info("Синхронизировано № по датасету: %d", fixed_ids)
         print(f"Синхронизировано № по датасету: {fixed_ids}")
 
+    # Метаданные: условия прогона пишем до первого запроса к API,
+    # итоги (модель, токены, счётчики) дописываем в тот же файл в конце.
+    commit, dirty = git_state()
+    meta = {
+        "mode": args.mode,
+        "requested_model": pipeline.requested_model,
+        "response_model": None,
+        "system_fingerprint": None,
+        "prompt_version": prompts.PROMPT_VERSION,
+        "system_prompt": prompts.SYSTEM_PROMPT,
+        "temperature": config.TEMPERATURE,
+        "answer_column": answer_col,
+        "dataset_sha256": dataset_sha256(),
+        "git_commit": commit,
+        "git_dirty": dirty,
+        "run_started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "run_finished_at": None,
+        "limit": args.limit,
+        "processed": 0,
+        "skipped_existing": 0,
+        "usage": {},
+    }
+
+    existing_meta = read_metadata(out_path) if out_path.exists() else None
+
+    if out_path.exists() and existing_meta is None and not args.force:
+        logger.error(
+            "Нет метаданных для %s: нельзя проверить условия прогона. "
+            "Запустите с --force, чтобы перегенерировать всё заново.",
+            out_path,
+        )
+        sys.exit(2)
+
+    if existing_meta is not None and not args.force:
+        # Метаданные прежнего формата (без temperature) не позволяют проверить
+        # условия: предупреждаем и перезаписываем их в новом формате.
+        if "temperature" not in existing_meta:
+            logger.warning(
+                "Метаданные старого формата: условия прогона не проверены, "
+                "файл будет перезаписан в новом формате"
+            )
+            diffs = []
+        else:
+            diffs = check_conditions(existing_meta, meta)
+        if diffs:
+            logger.error(
+                "Условия прогона не совпадают с сохранёнными:\n  %s\n"
+                "Верните прежние параметры или запустите с --force, "
+                "чтобы перегенерировать всё заново.",
+                "\n  ".join(diffs),
+            )
+            sys.exit(2)
+        old_hash = existing_meta.get("dataset_sha256")
+        if old_hash and old_hash != meta["dataset_sha256"]:
+            logger.warning("Датасет изменился с прошлого запуска")
+        old_commit = existing_meta.get("git_commit")
+        if old_commit and old_commit != meta["git_commit"]:
+            logger.warning("Код изменился с прошлого запуска: %s -> %s", old_commit, commit)
+
+    if args.force and out_path.exists():
+        clear_answers(results_df, answer_col)
+        results_df.to_excel(out_path, index=False)
+        logger.info("--force: ответы очищены, прогон начнётся заново")
+    elif existing_meta is not None:
+        # Продолжение прогона: сохраняем накопленный провенанс и токены,
+        # иначе запуск без новых вопросов обнулил бы их.
+        meta["response_model"] = existing_meta.get("response_model")
+        meta["system_fingerprint"] = existing_meta.get("system_fingerprint")
+        if isinstance(existing_meta.get("usage"), dict):
+            meta["usage"] = dict(existing_meta["usage"])
+
+    write_metadata(out_path, meta)
+
     index_by_question = {}
     for pos, q_text in enumerate(results_df[QUESTION_COL]):
         index_by_question.setdefault(norm_question(q_text), pos)
 
     processed = 0
     skipped = 0
-    response_model = None
-    system_fingerprint = None
+    response_model = meta["response_model"]
+    system_fingerprint = meta["system_fingerprint"]
+    usage_totals: Dict[str, int] = dict(meta["usage"])
     total = len(source_df)
     print(f"Запуск: mode={args.mode}, model={args.model}")
     print(f"Выходной файл: {out_path}")
@@ -192,6 +357,7 @@ def main() -> None:
             if system_fingerprint and fingerprint != system_fingerprint:
                 logger.warning("Изменился system_fingerprint посреди прогона: %s", fingerprint)
             system_fingerprint = fingerprint
+        add_usage(usage_totals, answer.meta.get("usage"))
 
         if pos is None:
             # Вопроса ещё нет в файле результатов — добавляем строку.
@@ -208,21 +374,16 @@ def main() -> None:
         results_df.to_excel(out_path, index=False)
         processed += 1
 
-    # Метаданные прогона для отслеживаемости эксперимента.
-    save_metadata(out_path, {
-        "mode": args.mode,
-        "model": args.model,
+    # Дописываем в метаданные то, что стало известно после ответов.
+    meta.update({
         "response_model": response_model,
         "system_fingerprint": system_fingerprint,
-        "prompt_version": prompts.PROMPT_VERSION,
-        "date": date_str,
-        "system_prompt": prompts.SYSTEM_PROMPT,
-        "answer_column": answer_col,
-        "total_questions": total,
-        "limit": args.limit,
+        "run_finished_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "processed": processed,
         "skipped_existing": skipped,
+        "usage": usage_totals,
     })
+    write_metadata(out_path, meta)
 
     print(f"Готово: обработано {processed}, пропущено (уже есть) {skipped}.")
     print(f"Результаты: {out_path}")

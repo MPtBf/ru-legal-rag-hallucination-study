@@ -95,6 +95,8 @@ class GigaChatModel(BaseLLM):
         self.last_model = None
         # У GigaChat аналога system_fingerprint нет.
         self.last_fingerprint = None
+        # Токены последнего ответа: нужны для оценки стоимости прогона.
+        self.last_usage = None
         # Клиент переиспользуется между запросами: иначе на каждую попытку
         # уходил бы лишний OAuth-запрос. Токен SDK обновляет сам.
         # max_retries=0: повторами управляет _call_with_retries, а не SDK.
@@ -123,6 +125,7 @@ class GigaChatModel(BaseLLM):
             if not res.choices:
                 raise EmptyResponseError("GigaChat: пустой список choices")
             self.last_model = res.model
+            self.last_usage = res.usage.model_dump() if res.usage else None
             return _require_text("GigaChat", res.choices[0].message.content)
 
         return _call_with_retries("GigaChat", request)
@@ -140,6 +143,8 @@ class DeepSeekModel(BaseLLM):
         self.last_model = None
         # Отпечаток конфигурации бэкенда: меняется при обновлении весов/настроек.
         self.last_fingerprint = None
+        # Токены последнего ответа: нужны для оценки стоимости прогона.
+        self.last_usage = None
 
     def generate_response(self, prompt: str, system_prompt: str = "") -> str:
         messages = []
@@ -175,6 +180,7 @@ class DeepSeekModel(BaseLLM):
                     raise EmptyResponseError("DeepSeek: пустой список choices")
                 self.last_model = data.get("model")
                 self.last_fingerprint = data.get("system_fingerprint")
+                self.last_usage = data.get("usage")
                 return _require_text("DeepSeek", choices[0].get("message", {}).get("content"))
 
         return _call_with_retries("DeepSeek", request)

@@ -16,8 +16,10 @@ class ZeroShotPipeline:
             raise ValueError(f"Неизвестная модель: {model}")
         if model == "gigachat":
             self.llm = GigaChatModel(auth_key=config.GIGACHAT_AUTH_KEY)
+            self.requested_model = config.GIGACHAT_MODEL
         else:
             self.llm = DeepSeekModel(api_key=config.DEEPSEEK_API_KEY)
+            self.requested_model = config.DEEPSEEK_MODEL
         self.model = model
         self.answer_col = f"{self.ANSWER_PREFIX}_{config.MODEL_LABELS[model]}_ZeroShot"
 
@@ -29,5 +31,6 @@ class ZeroShotPipeline:
             meta={
                 "response_model": self.llm.last_model,
                 "system_fingerprint": self.llm.last_fingerprint,
+                "usage": self.llm.last_usage,
             },
         )
