@@ -156,11 +156,10 @@ def main() -> None:
         try:
             answer = pipeline.answer(q_text)
         except LLMRequestError as error:
-            logger.error("Остановка прогона: %s", error)
-            print(f"ОШИБКА: {error}", file=sys.stderr)
-            print(
-                f"Сохранено ответов: {processed}. Перезапустите - заполненные строки будут пропущены.",
-                file=sys.stderr,
+            logger.error(
+                "Остановка прогона на вопросе №%s: %s. Сохранено ответов: %d; "
+                "при перезапуске заполненные строки будут пропущены.",
+                q_id, error, processed,
             )
             sys.exit(1)
         text = answer.text
