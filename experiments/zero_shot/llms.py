@@ -44,13 +44,29 @@ def _short(message: str, limit: int = 300) -> str:
 
 
 def _is_retryable(error: Exception) -> bool:
-    """Повторяем только временные сбои: сеть, таймауты, 429 и 5xx."""
+    """Повторяем только временные сбои: сеть, таймауты, 408, 429 и 5xx."""
     if isinstance(error, (RateLimitError, ServerError, EmptyResponseError)):
         return True
     if isinstance(error, httpx.HTTPStatusError):
         status = error.response.status_code
-        return status == 429 or status >= 500
+        return status in (408, 429) or status >= 500
     return isinstance(error, (httpx.TransportError, TimeoutError, ConnectionError))
+
+
+def _retry_delay(error: Exception, attempt: int) -> float:
+    """Пауза перед повтором: Retry-After сервера, иначе экспоненциальная."""
+    if isinstance(error, RateLimitError) and error.retry_after > 0:
+        return float(error.retry_after)
+    if isinstance(error, httpx.HTTPStatusError):
+        value = error.response.headers.get("Retry-After")
+        if value:
+            try:
+                seconds = float(value)
+            except ValueError:
+                seconds = 0
+            if seconds > 0:
+                return seconds
+    return float(config.RETRY_BASE_DELAY * (2 ** (attempt - 1)))
 
 
 def _call_with_retries(model: str, request):
@@ -68,7 +84,7 @@ def _call_with_retries(model: str, request):
             )
             if not _is_retryable(error) or attempt == config.RETRY_ATTEMPTS:
                 break
-            delay = config.RETRY_BASE_DELAY * (2 ** (attempt - 1))
+            delay = _retry_delay(error, attempt)
             logger.info("%s: повтор через %s с", model, delay)
             time.sleep(delay)
     raise LLMRequestError(model, attempt, last_error)
