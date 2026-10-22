@@ -91,6 +91,8 @@ class GigaChatModel(BaseLLM):
                 "Не задан GIGACHAT_AUTH_KEY. Скопируй .env.example в .env и заполни ключ."
             )
         self.auth_key = auth_key
+        # Фактическая модель из последнего ответа (например, "GigaChat-2:2.0.30.01").
+        self.last_model = None
         # Клиент переиспользуется между запросами: иначе на каждую попытку
         # уходил бы лишний OAuth-запрос. Токен SDK обновляет сам.
         # max_retries=0: повторами управляет _call_with_retries, а не SDK.
@@ -118,6 +120,7 @@ class GigaChatModel(BaseLLM):
             )
             if not res.choices:
                 raise EmptyResponseError("GigaChat: пустой список choices")
+            self.last_model = res.model
             return _require_text("GigaChat", res.choices[0].message.content)
 
         return _call_with_retries("GigaChat", request)
@@ -131,6 +134,8 @@ class DeepSeekModel(BaseLLM):
             )
         self.api_key = api_key
         self.url = config.DEEPSEEK_URL
+        # Фактическая модель из последнего ответа (например, "deepseek-flash").
+        self.last_model = None
 
     def generate_response(self, prompt: str, system_prompt: str = "") -> str:
         messages = []
@@ -164,6 +169,7 @@ class DeepSeekModel(BaseLLM):
                 choices = data.get("choices") or []
                 if not choices:
                     raise EmptyResponseError("DeepSeek: пустой список choices")
+                self.last_model = data.get("model")
                 return _require_text("DeepSeek", choices[0].get("message", {}).get("content"))
 
         return _call_with_retries("DeepSeek", request)

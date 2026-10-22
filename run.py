@@ -153,6 +153,7 @@ def main() -> None:
 
     processed = 0
     skipped = 0
+    response_models = set()
     total = len(source_df)
     print(f"Запуск: mode={args.mode}, model={args.model}")
     print(f"Выходной файл: {out_path}")
@@ -178,6 +179,11 @@ def main() -> None:
             )
             sys.exit(1)
         text = answer.text
+        response_model = answer.meta.get("response_model")
+        if response_model:
+            if response_models and response_model not in response_models:
+                logger.warning("Модель ответа изменилась посреди прогона: %s", response_model)
+            response_models.add(response_model)
 
         if pos is None:
             # Вопроса ещё нет в файле результатов — добавляем строку.
@@ -198,6 +204,7 @@ def main() -> None:
     save_metadata(out_path, {
         "mode": args.mode,
         "model": args.model,
+        "response_models": sorted(response_models),
         "prompt_version": prompts.PROMPT_VERSION,
         "date": date_str,
         "system_prompt": prompts.SYSTEM_PROMPT,
