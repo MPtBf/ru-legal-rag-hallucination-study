@@ -6,6 +6,7 @@ import httpx
 import urllib3
 from gigachat import GigaChat
 from gigachat.exceptions import RateLimitError, ServerError
+from gigachat.models import Chat, Messages
 
 import config
 
@@ -90,7 +91,12 @@ class GigaChatModel(BaseLLM):
                 max_retries=0,
             )
             with client as cl:
-                res = cl.chat(full_prompt)
+                res = cl.chat(
+                    Chat(
+                        messages=[Messages(role="user", content=full_prompt)],
+                        temperature=config.TEMPERATURE,
+                    )
+                )
                 return res.choices[0].message.content
 
         return _call_with_retries("GigaChat", request)
