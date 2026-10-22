@@ -5,6 +5,8 @@ import httpx
 import urllib3
 from gigachat import GigaChat
 
+import config
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
@@ -38,7 +40,7 @@ class GigaChatModel(BaseLLM):
 
         client = GigaChat(
             credentials=self.auth_key,
-            model="GigaChat-2",
+            model=config.GIGACHAT_MODEL,
             verify_ssl_certs=False
         )
         try:
@@ -57,7 +59,7 @@ class DeepSeekModel(BaseLLM):
                 "Не задан DEEPSEEK_API_KEY. Скопируй .env.example в .env и заполни ключ."
             )
         self.api_key = api_key
-        self.url = "https://deepseek.com"
+        self.url = config.DEEPSEEK_URL
 
     def generate_response(self, prompt: str, system_prompt: str = "") -> str:
         messages = []
@@ -66,9 +68,9 @@ class DeepSeekModel(BaseLLM):
         messages.append({"role": "user", "content": prompt})
 
         payload = {
-            "model": "deepseek-chat",
+            "model": config.DEEPSEEK_MODEL,
             "messages": messages,
-            "temperature": 0.1,
+            "temperature": config.TEMPERATURE,
             "tool_choice": "none"
         }
 
