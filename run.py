@@ -11,7 +11,7 @@ import pandas as pd
 import config
 import prompts
 from experiments import PIPELINES
-from experiments.zero_shot.llms import LLMRequestError
+from experiments.errors import LLMRequestError
 
 logger = logging.getLogger(__name__)
 
