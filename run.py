@@ -1,5 +1,7 @@
 import argparse
 import json
+import logging
+import sys
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict
@@ -9,11 +11,13 @@ import pandas as pd
 import config
 import prompts
 from experiments import PIPELINES
+from experiments.zero_shot.llms import LLMRequestError
+
+logger = logging.getLogger(__name__)
 
 ID_COL = "№"
 QUESTION_COL = "Вопрос"
 MARKUP_COLUMNS = ["Была галлюцинация (да/нет)", "Комментарий"]
-ERROR_PREFIX = "[Ошибка"
 
 
 def norm_question(value: Any) -> str:
@@ -22,9 +26,9 @@ def norm_question(value: Any) -> str:
 
 
 def is_filled(value: Any) -> bool:
-    """Ответ считается готовым, если он непустой и не является ошибкой API."""
+    """Ответ считается готовым, если он непустой."""
     text = "" if pd.isna(value) else str(value).strip()
-    return text != "" and not text.startswith(ERROR_PREFIX)
+    return text != ""
 
 
 def read_or_create(source_df: pd.DataFrame, out_path: Path, answer_col: str) -> pd.DataFrame:
@@ -44,6 +48,22 @@ def save_metadata(out_path: Path, meta: Dict[str, Any]) -> None:
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
 
+def setup_logging(mode: str, model: str, date_str: str) -> Path:
+    """Логи прогона: файл logs/{mode}_{model}_{дата}.log и консоль."""
+    config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = config.LOGS_DIR / f"{mode}_{model}_{date_str}.log"
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[
+            logging.FileHandler(log_path, encoding="utf-8"),
+            logging.StreamHandler(),
+        ],
+    )
+    return log_path
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Единый раннер RAG-экспериментов")
     parser.add_argument("--mode", required=True, choices=sorted(PIPELINES), help="режим эксперимента")
@@ -53,6 +73,7 @@ def main() -> None:
     args = parser.parse_args()
 
     date_str = date.today().isoformat()
+    log_path = setup_logging(args.mode, args.model, date_str)
     pipeline_cls = PIPELINES[args.mode]
     pipeline = pipeline_cls(model=args.model)
     answer_col = pipeline.answer_col
@@ -89,6 +110,7 @@ def main() -> None:
     total = len(source_df)
     print(f"Запуск: mode={args.mode}, model={args.model}")
     print(f"Выходной файл: {out_path}")
+    logger.info("Запуск: mode=%s, model=%s, файл=%s, лог=%s", args.mode, args.model, out_path, log_path)
 
     for idx, row in source_df.iterrows():
         q_id = row[ID_COL]
@@ -100,7 +122,16 @@ def main() -> None:
             continue
 
         print(f"Обработка: строка {idx + 1}/{total} (Вопрос №{q_id})...")
-        answer = pipeline.answer(q_text)
+        try:
+            answer = pipeline.answer(q_text)
+        except LLMRequestError as error:
+            logger.error("Остановка прогона: %s", error)
+            print(f"ОШИБКА: {error}", file=sys.stderr)
+            print(
+                f"Сохранено ответов: {processed}. Перезапустите - заполненные строки будут пропущены.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         text = answer.text
 
         if pos is None:
@@ -134,6 +165,7 @@ def main() -> None:
 
     print(f"Готово: обработано {processed}, пропущено (уже есть) {skipped}.")
     print(f"Результаты: {out_path}")
+    logger.info("Готово: обработано %d, пропущено %d", processed, skipped)
 
 
 if __name__ == "__main__":

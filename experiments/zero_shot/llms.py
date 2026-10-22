@@ -1,22 +1,65 @@
-import sys
+import logging
+import time
 from abc import ABC, abstractmethod
 
 import httpx
 import urllib3
 from gigachat import GigaChat
+from gigachat.exceptions import RateLimitError, ServerError
 
 import config
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+logger = logging.getLogger(__name__)
+
+
+class LLMRequestError(RuntimeError):
+    """Запрос к модели не удался после всех попыток."""
+
+    def __init__(self, model: str, attempts: int, last_error: Exception):
+        self.model = model
+        self.attempts = attempts
+        self.last_error = last_error
+        super().__init__(
+            f"{model}: запрос не выполнен за {attempts} попыток; "
+            f"последняя ошибка - {type(last_error).__name__}: {last_error}"
+        )
 
 
 def _short(message: str, limit: int = 300) -> str:
     return message if len(message) <= limit else message[:limit] + "..."
 
 
-def log_error(model: str, message: str) -> None:
-    """Печатает ошибку запроса в консоль сразу, а не только в итоговой таблице."""
-    print(f"[ОШИБКА] {model}: {_short(message)}", file=sys.stderr, flush=True)
+def _is_retryable(error: Exception) -> bool:
+    """Повторяем только временные сбои: сеть, таймауты, 429 и 5xx."""
+    if isinstance(error, (RateLimitError, ServerError)):
+        return True
+    if isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+        return status == 429 or status >= 500
+    return isinstance(error, (httpx.TransportError, TimeoutError, ConnectionError))
+
+
+def _call_with_retries(model: str, request):
+    """Выполняет запрос с повторами и экспоненциальной паузой."""
+    last_error = None
+    attempt = 0
+    for attempt in range(1, config.RETRY_ATTEMPTS + 1):
+        try:
+            return request()
+        except Exception as error:
+            last_error = error
+            logger.error(
+                "%s: попытка %d/%d не удалась - %s: %s",
+                model, attempt, config.RETRY_ATTEMPTS, type(error).__name__, _short(str(error)),
+            )
+            if not _is_retryable(error) or attempt == config.RETRY_ATTEMPTS:
+                break
+            delay = config.RETRY_BASE_DELAY * (2 ** (attempt - 1))
+            logger.info("%s: повтор через %s с", model, delay)
+            time.sleep(delay)
+    raise LLMRequestError(model, attempt, last_error)
 
 
 class BaseLLM(ABC):
@@ -38,18 +81,19 @@ class GigaChatModel(BaseLLM):
         if system_prompt:
             full_prompt = f"{system_prompt}\n\nВопрос: {prompt}"
 
-        client = GigaChat(
-            credentials=self.auth_key,
-            model=config.GIGACHAT_MODEL,
-            verify_ssl_certs=False
-        )
-        try:
+        def request() -> str:
+            # max_retries=0: повторами управляет _call_with_retries, а не SDK.
+            client = GigaChat(
+                credentials=self.auth_key,
+                model=config.GIGACHAT_MODEL,
+                verify_ssl_certs=False,
+                max_retries=0,
+            )
             with client as cl:
                 res = cl.chat(full_prompt)
                 return res.choices[0].message.content
-        except Exception as e:
-            log_error("GigaChat", f"{type(e).__name__}: {e}")
-            return f"[Ошибка GigaChat API]: {_short(f'{type(e).__name__}: {e}')}"
+
+        return _call_with_retries("GigaChat", request)
 
 
 class DeepSeekModel(BaseLLM):
@@ -80,14 +124,15 @@ class DeepSeekModel(BaseLLM):
             "Accept": "application/json"
         }
 
-        try:
+        def request() -> str:
             with httpx.Client(http2=True, verify=False, timeout=30.0) as client:
                 response = client.post(self.url, json=payload, headers=headers)
-                if response.status_code == 200:
-                    return response.json()["choices"][0]["message"]["content"]
-                else:
-                    log_error("DeepSeek", f"HTTP {response.status_code}: {response.text}")
-                    return f"[Ошибка DeepSeek API {response.status_code}]: {_short(response.text)}"
-        except Exception as e:
-            log_error("DeepSeek", f"{type(e).__name__}: {e}")
-            return f"[Ошибка сети DeepSeek]: {_short(f'{type(e).__name__}: {e}')}"
+                if response.status_code != 200:
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {response.status_code}: {_short(response.text)}",
+                        request=response.request,
+                        response=response,
+                    )
+                return response.json()["choices"][0]["message"]["content"]
+
+        return _call_with_retries("DeepSeek", request)

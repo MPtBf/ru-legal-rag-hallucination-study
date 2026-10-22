@@ -23,6 +23,13 @@ DEEPSEEK_MODEL = "deepseek-chat"
 # Параметры генерации
 TEMPERATURE = 0.1
 
+# Повторы запросов: 5 попыток с паузой 2, 4, 8, 16 секунд
+RETRY_ATTEMPTS = 5
+RETRY_BASE_DELAY = 2
+
+# Каталог логов прогонов
+LOGS_DIR = BASE_DIR / "logs"
+
 # Endpoints
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 
