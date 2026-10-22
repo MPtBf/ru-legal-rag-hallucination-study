@@ -87,7 +87,7 @@ def _call_with_retries(model: str, request):
             delay = _retry_delay(error, attempt)
             logger.info("%s: повтор через %s с", model, delay)
             time.sleep(delay)
-    raise LLMRequestError(model, attempt, last_error)
+    raise LLMRequestError(model, attempt, last_error) from last_error
 
 
 class BaseLLM(ABC):
