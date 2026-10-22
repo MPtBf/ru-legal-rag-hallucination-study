@@ -78,9 +78,11 @@ class GigaChatModel(BaseLLM):
         self.auth_key = auth_key
 
     def generate_response(self, prompt: str, system_prompt: str = "") -> str:
-        full_prompt = prompt
+        # Как и у DeepSeek: инструкция отдельным system-сообщением, вопрос - user.
+        messages = []
         if system_prompt:
-            full_prompt = f"{system_prompt}\n\nВопрос: {prompt}"
+            messages.append(Messages(role="system", content=system_prompt))
+        messages.append(Messages(role="user", content=prompt))
 
         def request() -> str:
             # max_retries=0: повторами управляет _call_with_retries, а не SDK.
@@ -93,7 +95,7 @@ class GigaChatModel(BaseLLM):
             with client as cl:
                 res = cl.chat(
                     Chat(
-                        messages=[Messages(role="user", content=full_prompt)],
+                        messages=messages,
                         temperature=config.TEMPERATURE,
                     )
                 )
