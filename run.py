@@ -83,10 +83,12 @@ def main() -> None:
         out_path = args.output_path
         out_path.parent.mkdir(parents=True, exist_ok=True)
     else:
+        # results/{mode}/{model}/{mode}_{model}_{prompt_version}.xlsx
         out_dir = config.RESULTS_DIR / args.mode / args.model
         out_dir.mkdir(parents=True, exist_ok=True)
-        # PROMPT_VERSION уже содержит префикс "v" (например "v1")
-        fname = f"{args.mode}_{args.model}_{date_str}_{prompts.PROMPT_VERSION}.xlsx"
+        # PROMPT_VERSION уже содержит префикс "v" (например "v1").
+        # Даты в имени нет: прогон продолжается в том же файле и на следующий день.
+        fname = f"{args.mode}_{args.model}_{prompts.PROMPT_VERSION}.xlsx"
         out_path = out_dir / fname
 
     source_df = config.load_dataset()
