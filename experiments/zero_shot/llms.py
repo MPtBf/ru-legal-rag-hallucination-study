@@ -91,6 +91,15 @@ class GigaChatModel(BaseLLM):
                 "Не задан GIGACHAT_AUTH_KEY. Скопируй .env.example в .env и заполни ключ."
             )
         self.auth_key = auth_key
+        # Клиент переиспользуется между запросами: иначе на каждую попытку
+        # уходил бы лишний OAuth-запрос. Токен SDK обновляет сам.
+        # max_retries=0: повторами управляет _call_with_retries, а не SDK.
+        self.client = GigaChat(
+            credentials=auth_key,
+            model=config.GIGACHAT_MODEL,
+            verify_ssl_certs=False,
+            max_retries=0,
+        )
 
     def generate_response(self, prompt: str, system_prompt: str = "") -> str:
         # Как и у DeepSeek: инструкция отдельным system-сообщением, вопрос - user.
@@ -100,23 +109,15 @@ class GigaChatModel(BaseLLM):
         messages.append(Messages(role="user", content=prompt))
 
         def request() -> str:
-            # max_retries=0: повторами управляет _call_with_retries, а не SDK.
-            client = GigaChat(
-                credentials=self.auth_key,
-                model=config.GIGACHAT_MODEL,
-                verify_ssl_certs=False,
-                max_retries=0,
-            )
-            with client as cl:
-                res = cl.chat(
-                    Chat(
-                        messages=messages,
-                        temperature=config.TEMPERATURE,
-                    )
+            res = self.client.chat(
+                Chat(
+                    messages=messages,
+                    temperature=config.TEMPERATURE,
                 )
-                if not res.choices:
-                    raise EmptyResponseError("GigaChat: пустой список choices")
-                return _require_text("GigaChat", res.choices[0].message.content)
+            )
+            if not res.choices:
+                raise EmptyResponseError("GigaChat: пустой список choices")
+            return _require_text("GigaChat", res.choices[0].message.content)
 
         return _call_with_retries("GigaChat", request)
 
