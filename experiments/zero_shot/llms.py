@@ -99,6 +99,7 @@ class GigaChatModel(BaseLLM):
             model=config.GIGACHAT_MODEL,
             verify_ssl_certs=False,
             max_retries=0,
+            timeout=config.REQUEST_TIMEOUT,
         )
 
     def generate_response(self, prompt: str, system_prompt: str = "") -> str:
@@ -151,7 +152,7 @@ class DeepSeekModel(BaseLLM):
         }
 
         def request() -> str:
-            with httpx.Client(http2=True, verify=False, timeout=30.0) as client:
+            with httpx.Client(http2=True, verify=False, timeout=config.REQUEST_TIMEOUT) as client:
                 response = client.post(self.url, json=payload, headers=headers)
                 if response.status_code != 200:
                     raise httpx.HTTPStatusError(

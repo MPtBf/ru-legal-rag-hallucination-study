@@ -26,6 +26,9 @@ MODEL_LABELS = {"gigachat": "GigaChat", "deepseek": "DeepSeek"}
 # Параметры генерации
 TEMPERATURE = 0.1
 
+# Таймаут одного HTTP-запроса к модели, секунды
+REQUEST_TIMEOUT = 30
+
 # Повторы запросов: 5 попыток с паузой 2, 4, 8, 16 секунд
 RETRY_ATTEMPTS = 5
 RETRY_BASE_DELAY = 2
