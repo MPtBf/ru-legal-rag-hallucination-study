@@ -153,8 +153,8 @@ def main() -> None:
 
     processed = 0
     skipped = 0
-    response_models = set()
-    system_fingerprints = set()
+    response_model = None
+    system_fingerprint = None
     total = len(source_df)
     print(f"Запуск: mode={args.mode}, model={args.model}")
     print(f"Выходной файл: {out_path}")
@@ -180,16 +180,18 @@ def main() -> None:
             )
             sys.exit(1)
         text = answer.text
-        response_model = answer.meta.get("response_model")
-        if response_model:
-            if response_models and response_model not in response_models:
-                logger.warning("Модель ответа изменилась посреди прогона: %s", response_model)
-            response_models.add(response_model)
+        model = answer.meta.get("response_model")
+        if model:
+            if response_model and model != response_model:
+                logger.warning(
+                    "Модель ответа изменилась посреди прогона: %s -> %s", response_model, model
+                )
+            response_model = model
         fingerprint = answer.meta.get("system_fingerprint")
         if fingerprint:
-            if system_fingerprints and fingerprint not in system_fingerprints:
+            if system_fingerprint and fingerprint != system_fingerprint:
                 logger.warning("Изменился system_fingerprint посреди прогона: %s", fingerprint)
-            system_fingerprints.add(fingerprint)
+            system_fingerprint = fingerprint
 
         if pos is None:
             # Вопроса ещё нет в файле результатов — добавляем строку.
@@ -210,8 +212,8 @@ def main() -> None:
     save_metadata(out_path, {
         "mode": args.mode,
         "model": args.model,
-        "response_models": sorted(response_models),
-        "system_fingerprints": sorted(system_fingerprints),
+        "response_model": response_model,
+        "system_fingerprint": system_fingerprint,
         "prompt_version": prompts.PROMPT_VERSION,
         "date": date_str,
         "system_prompt": prompts.SYSTEM_PROMPT,
