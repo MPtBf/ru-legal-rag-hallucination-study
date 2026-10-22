@@ -86,13 +86,28 @@ def setup_logging(mode: str, model: str, date_str: str) -> Path:
     return log_path
 
 
+def positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("значение должно быть больше нуля")
+    return number
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Единый раннер RAG-экспериментов")
     parser.add_argument("--mode", required=True, choices=sorted(PIPELINES), help="режим эксперимента")
     parser.add_argument("--model", required=True, choices=["gigachat", "deepseek"], help="модель")
-    parser.add_argument("--limit", type=int, default=None, help="обработать только первые N вопросов (для тестов)")
+    parser.add_argument("--limit", type=positive_int, default=None, help="обработать только первые N вопросов (для тестов)")
     parser.add_argument("--output-path", type=Path, default=None, help="свой путь к файлу результатов (для тестов)")
     args = parser.parse_args()
+
+    if args.output_path is not None:
+        out_path = args.output_path.resolve()
+        if out_path.is_dir():
+            parser.error("--output-path должен указывать на файл, а не на каталог")
+        data_dir = (config.BASE_DIR / "data").resolve()
+        if out_path == data_dir or data_dir in out_path.parents:
+            parser.error("--output-path не может указывать в каталог data/")
 
     date_str = date.today().isoformat()
     log_path = setup_logging(args.mode, args.model, date_str)
