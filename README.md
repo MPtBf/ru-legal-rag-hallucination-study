@@ -1,14 +1,53 @@
 # Снижение галлюцинаций в русскоязычных юридических RAG-системах: систематическое сравнение гибридного, графового и агентного поиска
 
+Эксперименты по сравнению RAG-стратегий (naive → hybrid → graph) на русскоязычном трудовом праве РФ. В текущей версии реализован режим `zero_shot`, RAG-режимы добавляются позже.
+
+## Установка
+
+```bash
+python -m venv venv
+venv\Scripts\pip install -r requirements.txt
+```
+
+Ключи API — в файле `.env` (шаблон — `.env.example`).
+
+## Запуск
+
+Единый раннер `run.py`:
+
+```bash
+venv\Scripts\python run.py --mode zero_shot --model gigachat
+venv\Scripts\python run.py --mode zero_shot --model deepseek
+```
+
+* `--mode` — режим эксперимента (сейчас реализован `zero_shot`)
+* `--model` — модель: `gigachat` или `deepseek`
+* `--limit N` — обработать только первые N вопросов (для быстрой проверки)
+* `--output-path PATH` — сохранить результат по указанному пути вместо `results/`
+
+При продолжении запуска ответы сопоставляются по тексту вопроса (нумерация `№` в датасете и результатах может расходиться), а ответы вида `[Ошибка ...]` считаются незаполненными и запрашиваются повторно.
+
+Если для этого режима, модели и версии промпта уже есть таблица результатов (имя файла включает дату), запуск продолжается с последней записи: готовые ответы не перегенерируются. Для нового дня создаётся новый файл.
+
+Тестовый прогон на 5 вопросах (не затрагивает боевые файлы результатов):
+
+```bash
+venv\Scripts\python run.py --mode zero_shot --model gigachat --limit 5 --output-path results\_test\zero_shot_gigachat_limit5.xlsx
+```
+
+Результаты сохраняются в `results/{mode}/{model}/{mode}_{model}_{дата}_v{версия_промпта}.xlsx`, рядом — `*_metadata.json` с параметрами прогона и текстом промпта.
+
 ## Структура проекта
 
-* `config.py` — конфигурационный файл, хранение API-ключей и путей к данным
-* `models.py` — классы `GigaChatModel` и `DeepSeekModel`
-* `zero-shot-gigachat.py` — последовательный опрос модели GigaChat-2
-* `zero-shot-deepseek.py` — последовательный опрос модели DeepSeek-V3
+* `config.py` — пути к данным, API-ключи, константы моделей
+* `prompts.py` — тексты промптов и версия промпта (`PROMPT_VERSION`)
+* `run.py` — единый раннер всех экспериментов
+* `experiments/` — пайплайны режимов (`zero_shot/`); новый режим регистрируется декоратором `@register_pipeline("имя")`. В `experiments/zero_shot/` лежат `llms.py` (классы `GigaChatModel` и `DeepSeekModel`) и `pipeline.py` — они относятся только к нулевому шоту, RAG работает через свои LangChain-классы
+* `data/dataset.xlsx` — датасет из 211 юридических кейсов с эталонными ответами и ссылками на статьи ТК РФ
+* `data/corpus/tk_rf_articles.jsonl` — корпус статей ТК РФ (534 статьи)
+* `data/index/` — каталог для индекса RAG (создаётся при построении индекса, содержимое не хранится в git)
 
-## Датасеты
+## Результаты
 
-* `dataset.xlsx` — файл, содержащий 211 юридических кейсов и эталонные ответы со ссылками на статьи ТК РФ
-* `results_GigaChat_ZeroShot.xlsx` — результаты генерации модели Gigachat (Zero-shot - без дополнительной базы знаний)
-* `results_DeepSeek_ZeroShot.xlsx` — результаты генерации модели DeepSeek (Zero-shot - без дополнительной базы знаний)
+* `results/zero_shot/gigachat/` — Zero-shot, GigaChat (без дополнительной базы знаний)
+* `results/zero_shot/deepseek/` — Zero-shot, DeepSeek (без дополнительной базы знаний)
