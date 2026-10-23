@@ -47,6 +47,16 @@ RETRY_BASE_DELAY = 2
 # Каталог логов прогонов
 LOGS_DIR = BASE_DIR / "logs"
 
+# Наивный RAG: модель эмбеддингов, чанкинг корпуса и глубина поиска.
+# Ревизия весов на HuggingFace фиксирует индекс: без неё пересборка
+# могла бы молча дать другой результат при обновлении модели.
+EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
+EMBEDDING_REVISION = "614241f622f53c4eeff9890bdc4f31cfecc418b3"
+CHUNK_SIZE = 900
+CHUNK_OVERLAP = 150
+TOP_K = 5
+INDEX_VERSION = "v1"
+
 
 def load_dataset() -> pd.DataFrame:
     return pd.read_excel(DATASET_PATH)
