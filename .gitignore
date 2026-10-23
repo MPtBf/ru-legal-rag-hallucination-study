@@ -1,0 +1,26 @@
+# Секреты
+.env
+
+# Виртуальное окружение
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# IDE
+.idea/
+.vscode/
+
+# Заметки
+temp.md
+
+# Кэш индекса RAG
+data/index/
+
+# Логи прогонов
+logs/
+
+# Временные результаты тестовых прогонов
+results/_test/

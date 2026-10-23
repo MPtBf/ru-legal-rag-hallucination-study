@@ -1,0 +1,36 @@
+import config
+import prompts
+from experiments import Answer, register_pipeline
+from llms import DeepSeekModel, GigaChatModel
+
+
+@register_pipeline("zero_shot")
+class ZeroShotPipeline:
+    """Нулевой шот: вопрос отправляется без контекста."""
+
+    # Название колонки с ответом должно совпадать с уже сгенерированными файлами.
+    ANSWER_PREFIX = "Ответ"
+
+    def __init__(self, model: str):
+        if model not in config.allowed_models:
+            raise ValueError(f"Неизвестная модель: {model}")
+        if model == "gigachat":
+            self.llm = GigaChatModel(auth_key=config.GIGACHAT_AUTH_KEY)
+            self.requested_model = config.GIGACHAT_MODEL
+        else:
+            self.llm = DeepSeekModel(api_key=config.DEEPSEEK_API_KEY)
+            self.requested_model = config.DEEPSEEK_MODEL
+        self.model = model
+        self.answer_col = f"{self.ANSWER_PREFIX}_{model}_ZeroShot"
+
+    def answer(self, question: str) -> Answer:
+        # Вызов модели сохраняем как в исходных скриптах: промпт и та же инструкция.
+        text = self.llm.generate_response(prompt=question, system_prompt=prompts.SYSTEM_PROMPT)
+        return Answer(
+            text=text,
+            meta={
+                "response_model": self.llm.last_model,
+                "system_fingerprint": self.llm.last_fingerprint,
+                "usage": self.llm.last_usage,
+            },
+        )

@@ -1,0 +1,20 @@
+pandas==2.3.3
+openpyxl==3.1.5
+gigachat==0.2.3
+httpx[http2]==0.28.1
+python-dotenv==1.2.4
+urllib3==2.8.0
+
+# LangChain (используется в llms.py для GigaChat и DeepSeek)
+langchain-core>=0.3.0
+langchain-gigachat>=0.3.0
+langchain-deepseek>=0.1.0
+
+# Будущие зависимости для RAG (векторный поиск, реранкинг, BM25)
+# langchain>=0.3.0
+# langchain-community>=0.3.0
+# langchain-chroma>=0.2.0
+# langchain-huggingface>=0.1.0
+# chromadb>=0.5.0
+# sentence-transformers>=3.0.0
+# rank_bm25>=0.2.2
