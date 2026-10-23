@@ -3,10 +3,17 @@
 Эксперименты по сравнению RAG-стратегий (naive → hybrid → graph) на русскоязычном трудовом праве РФ. Сейчас реализован только `zero_shot`, RAG-режимы добавляются позже.
 
 ## Установка
-
+VS Code:
 ```bash
 python -m venv venv
 venv\Scripts\pip install -r requirements.txt
+```
+
+PyCharm:
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 Ключи API — в `.env` (шаблон — `.env.example`).
@@ -14,9 +21,11 @@ venv\Scripts\pip install -r requirements.txt
 ## Запуск
 
 ```bash
-venv\Scripts\python run.py --mode zero_shot --model gigachat
-venv\Scripts\python run.py --mode zero_shot --model deepseek
+python run.py --mode zero_shot --model gigachat
+python run.py --mode zero_shot --model deepseek
 ```
+
+### Описание аргументов для run.py
 
 * `--limit N` — обработать только первые N вопросов (для проверки)
 * `--output-path PATH` — свой путь к результату (внутри `data/` запрещён)
@@ -25,8 +34,25 @@ venv\Scripts\python run.py --mode zero_shot --model deepseek
 Повторный запуск продолжает таблицу: готовые ответы пропускаются (в том числе на следующий день), незаполненные запрашиваются заново. Быстрый тест:
 
 ```bash
-venv\Scripts\python run.py --mode zero_shot --model gigachat --limit 5 --output-path results\_test\test.xlsx
+python run.py --mode zero_shot --model gigachat --limit 5 --output-path results\_test\test.xlsx
 ```
+
+
+### Оценка ответов (evaluate.py)
+
+Для проверки сгенерированных ответов на наличие галлюцинаций используется скрипт-судья:
+
+```bash
+python evaluate.py --model deepseek --file_path results/zero_shot/deepseek/zero_shot_deepseek_v2.xlsx
+```
+
+### Описание аргументов для evaluate.py
+
+* `--model` — модель-оценщик (`gigachat` или `deepseek`)
+* `--file_path` — путь к файлу с ответами
+* `--force` — очистить прошлые оценки и перегенерировать их заново
+
+Оценщик автоматически находит нужную колонку с ответами (опираясь на метаданные прогона) и построчно заполняет колонки `Была галлюцинация (да/нет)` и `Комментарий`, сохраняя файл после каждого шага.
 
 ### Условия и `--force`
 
@@ -41,13 +67,17 @@ venv\Scripts\python run.py --mode zero_shot --model gigachat --limit 5 --output-
 ## Структура
 
 * `config.py` — пути, ключи, константы моделей
-* `prompts.py` — промпты и `PROMPT_VERSION`
-* `run.py` — единый раннер экспериментов
-* `experiments/zero_shot/` — `llms.py` и `pipeline.py`; новый режим регистрируется через `@register_pipeline("имя")`
+* `prompts.py` — промпты (генерация и оценка) и `PROMPT_VERSION`
+* `llms.py` — клиенты для работы с API моделей (GigaChat, DeepSeek)
+* `run.py` — единый раннер экспериментов (генерация ответов)
+* `evaluate.py` — оценщик ответов на наличие галлюцинаций
+* `experiments/zero_shot/` — `pipeline.py`; новый режим регистрируется через `@register_pipeline("имя")`
 * `data/dataset.xlsx` — 211 кейсов с эталонными ответами и статьями ТК РФ
 * `data/corpus/tk_rf_articles.jsonl` — корпус статей ТК РФ (534 статьи)
 * `data/index/` — индекс RAG (не хранится в git)
 
 ## Результаты
 
-`results/{mode}/{model}/{mode}_{model}_{версия_промпта}.xlsx`, рядом — метаданные прогона.
+`results/{mode}/{model}/{mode}_{model}_{версия_промпта}.xlsx`, рядом — метаданные прогона. 
+
+После работы `evaluate.py` в файле результатов также заполняются колонки с оценкой галлюцинаций.
