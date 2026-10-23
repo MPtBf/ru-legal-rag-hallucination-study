@@ -3,4 +3,8 @@ openpyxl==3.1.5
 gigachat==0.2.3
 httpx[http2]==0.28.1
 python-dotenv==1.2.4
-urllib3==2.8.0
+
+# LangChain: клиенты моделей
+langchain-core==1.7.0
+langchain-gigachat==0.5.1
+langchain-deepseek==1.1.1
