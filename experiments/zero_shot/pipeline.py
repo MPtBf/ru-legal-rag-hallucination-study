@@ -20,6 +20,10 @@ class ZeroShotPipeline:
         else:
             self.llm = DeepSeekModel(api_key=config.DEEPSEEK_API_KEY)
             self.requested_model = config.DEEPSEEK_MODEL
+
+        if model == "gigachat": model = config.GIGACHAT_MODEL
+        if model == "deepseek": model = config.DEEPSEEK_MODEL
+
         self.model = model
         self.answer_col = f"{self.ANSWER_PREFIX}_{config.MODEL_LABELS[model]}_ZeroShot"
 
