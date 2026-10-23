@@ -38,12 +38,19 @@ venv\Scripts\python run.py --mode zero_shot --model gigachat --limit 5 --output-
 
 До 5 попыток на запрос: паузы 2, 4, 8, 16 с (или `Retry-After` от сервера), таймаут запроса 30 с. Повторяются только временные сбои (сеть, таймауты, 408, 429, 5xx), остальные завершают прогон сразу. Логи — в `logs/{mode}_{model}_{дата}.log`. Если попытки исчерпаны, скрипт выходит с кодом 1; полученные ответы уже сохранены и при перезапуске будут пропущены.
 
+## Модели
+
+Реестр — `MODELS` в `config.py`: алиас CLI → провайдер, имя модели в API (`api_model`) и подпись для колонки (`label`). Новый провайдер добавляется билдером в `llm/factory.py`.
+
+`llm.create_llm(alias)` — обёртка с нашими повторами и метаданными (`response_model`, `usage`, `system_fingerprint`); её используют эксперименты. `llm.create_chat_model(alias)` — «сырой» LangChain-клиент для цепочек и агентов.
+
 ## Структура
 
-* `config.py` — пути, ключи, константы моделей
+* `config.py` — пути, ключи, реестр моделей `MODELS`, параметры повторов
+* `llm/` — общий слой: создание клиентов, повторы, разбор ответа
 * `prompts.py` — промпты и `PROMPT_VERSION`
 * `run.py` — единый раннер экспериментов
-* `experiments/zero_shot/` — `llms.py` и `pipeline.py`; новый режим регистрируется через `@register_pipeline("имя")`
+* `experiments/zero_shot/` — `pipeline.py`; новый режим регистрируется через `@register_pipeline("имя")`
 * `data/dataset.xlsx` — 211 кейсов с эталонными ответами и статьями ТК РФ
 * `data/corpus/tk_rf_articles.jsonl` — корпус статей ТК РФ (534 статьи)
 * `data/index/` — индекс RAG (не хранится в git)
