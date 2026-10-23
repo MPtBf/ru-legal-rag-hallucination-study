@@ -16,12 +16,23 @@ load_dotenv(BASE_DIR / ".env")
 GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
-# Имена моделей
-GIGACHAT_MODEL = "GigaChat-2"
-DEEPSEEK_MODEL = "deepseek-chat"
+# Реестр моделей: ключ CLI -> провайдер, имя модели в API и подпись в колонках.
+# Новую модель добавляем здесь; пайплайн и CLI берут данные отсюда.
+MODELS = {
+    "gigachat": {
+        "provider": "gigachat",
+        "api_model": "GigaChat-2",
+        "label": "GigaChat",
+    },
+    "deepseek": {
+        "provider": "deepseek",
+        "api_model": "deepseek-chat",
+        "label": "DeepSeek",
+    },
+}
 
 # Короткое имя для CLI и подпись в колонках результатов
-MODEL_LABELS = {"gigachat": "GigaChat", "deepseek": "DeepSeek"}
+MODEL_LABELS = {alias: item["label"] for alias, item in MODELS.items()}
 
 # Параметры генерации
 TEMPERATURE = 0.1
@@ -35,9 +46,6 @@ RETRY_BASE_DELAY = 2
 
 # Каталог логов прогонов
 LOGS_DIR = BASE_DIR / "logs"
-
-# Endpoints
-DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 
 
 def load_dataset() -> pd.DataFrame:

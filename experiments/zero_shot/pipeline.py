@@ -1,7 +1,7 @@
 import config
 import prompts
 from experiments import Answer, register_pipeline
-from experiments.zero_shot.llms import DeepSeekModel, GigaChatModel
+from llm import create_llm
 
 
 @register_pipeline("zero_shot")
@@ -12,16 +12,11 @@ class ZeroShotPipeline:
     ANSWER_PREFIX = "Ответ"
 
     def __init__(self, model: str):
-        if model not in config.MODEL_LABELS:
-            raise ValueError(f"Неизвестная модель: {model}")
-        if model == "gigachat":
-            self.llm = GigaChatModel(auth_key=config.GIGACHAT_AUTH_KEY)
-            self.requested_model = config.GIGACHAT_MODEL
-        else:
-            self.llm = DeepSeekModel(api_key=config.DEEPSEEK_API_KEY)
-            self.requested_model = config.DEEPSEEK_MODEL
+        self.llm = create_llm(model)
+        cfg = config.MODELS[model]
         self.model = model
-        self.answer_col = f"{self.ANSWER_PREFIX}_{config.MODEL_LABELS[model]}_ZeroShot"
+        self.requested_model = cfg["api_model"]
+        self.answer_col = f"{self.ANSWER_PREFIX}_{cfg['label']}_ZeroShot"
 
     def answer(self, question: str) -> Answer:
         # Вызов модели сохраняем как в исходных скриптах: промпт и та же инструкция.
