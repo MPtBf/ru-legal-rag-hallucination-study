@@ -17,6 +17,7 @@ class ZeroShotPipeline:
         self.model = model
         self.requested_model = cfg["api_model"]
         self.answer_col = f"{self.ANSWER_PREFIX}_{cfg['label']}_ZeroShot"
+        self.model = model
 
     def answer(self, question: str) -> Answer:
         # Вызов модели сохраняем как в исходных скриптах: промпт и та же инструкция.

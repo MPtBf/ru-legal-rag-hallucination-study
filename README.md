@@ -1,6 +1,6 @@
 # Снижение галлюцинаций в русскоязычных юридических RAG-системах: систематическое сравнение гибридного, графового и агентного поиска
 
-Эксперименты по сравнению RAG-стратегий (naive → hybrid → graph) на русскоязычном трудовом праве РФ. Реализованы `zero_shot` и `naive_rag`.
+Эксперименты по сравнению RAG-стратегий (naive → hybrid → graph) на русскоязычном трудовом праве РФ. Реализованы `zero_shot` и `naive_rag`; ответы можно оценивать автоматически LLM-судьёй с флагом `--evaluate`.
 
 ## Установка
 
@@ -17,11 +17,13 @@ venv\Scripts\pip install -r requirements.txt
 venv\Scripts\python run.py --mode zero_shot --model gigachat
 venv\Scripts\python run.py --mode zero_shot --model deepseek
 venv\Scripts\python run.py --mode naive_rag --model gigachat
+venv\Scripts\python run.py --mode zero_shot --model deepseek --evaluate
 ```
 
 * `--limit N` — обработать только первые N вопросов (для проверки)
 * `--output-path PATH` — свой путь к результату (внутри `data/` запрещён)
 * `--force` — очистить ответы и перегенерировать всё заново
+* `--evaluate` — оценить сгенерированные ответы по эталону; `--evaluate-model` задаёт алиас модели-судьи (по умолчанию `deepseek`)
 
 Повторный запуск продолжает таблицу: готовые ответы пропускаются (в том числе на следующий день), незаполненные запрашиваются заново. Быстрый тест:
 
@@ -68,3 +70,5 @@ venv\Scripts\python run.py --mode zero_shot --model gigachat --limit 5 --output-
 ## Результаты
 
 `results/{mode}/{model}/{mode}_{model}_{версия_промпта}.xlsx`, рядом — метаданные прогона.
+
+При `--evaluate` заполняются колонки «Была галлюцинация (да/нет)» и «Комментарий»; сведения о модели-судье и промпте оценки сохраняются в метаданных.

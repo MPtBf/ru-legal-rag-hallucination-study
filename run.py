@@ -15,10 +15,12 @@ import config
 import prompts
 from experiments import PIPELINES
 from llm import LLMRequestError
+from evaluate import EvaluateModel
 
 logger = logging.getLogger(__name__)
 
 ID_COL = "№"
+ETALON_COL = "Ответ"
 QUESTION_COL = "Вопрос"
 MARKUP_COLUMNS = ["Была галлюцинация (да/нет)", "Комментарий"]
 
@@ -31,6 +33,8 @@ CONDITION_FIELDS = [
     "temperature",
     "answer_column",
     "index",
+    "evaluate_model",
+    "evaluate_prompt",
 ]
 
 
@@ -203,6 +207,12 @@ def main() -> None:
         action="store_true",
         help="очистить ответы и перегенерировать всё заново, игнорируя прошлые условия",
     )
+    parser.add_argument("--evaluate", action="store_true", help="оценивать ответы LLM-судьёй")
+    parser.add_argument(
+        "--evaluate-model", "--evaluate_model", dest="evaluate_model",
+        default=config.EVALUATE_MODEL, choices=sorted(config.MODEL_LABELS),
+        help="алиас модели для оценки (по умолчанию deepseek)",
+    )
     args = parser.parse_args()
 
     if args.output_path is not None:
@@ -217,6 +227,7 @@ def main() -> None:
     log_path = setup_logging(args.mode, args.model, date_str)
     pipeline_cls = PIPELINES[args.mode]
     pipeline = pipeline_cls(model=args.model)
+    evaluate_client = EvaluateModel(args.evaluate_model) if args.evaluate else None
     answer_col = pipeline.answer_col
     # RAG-режимы определяют свой системный промпт и версию; zero-shot берёт общие.
     system_prompt = getattr(pipeline, "system_prompt", prompts.SYSTEM_PROMPT)
@@ -272,6 +283,8 @@ def main() -> None:
         "answer_column": answer_col,
         # Параметры индекса: условия ретривера, None у zero-shot.
         "index": getattr(pipeline, "index_conditions", None),
+        "evaluate_model": args.evaluate_model if evaluate_client else None,
+        "evaluate_prompt": prompts.EVALUATE_PROMPT if evaluate_client else None,
         "dataset_sha256": dataset_sha256(),
         "git_commit": commit,
         "git_dirty": dirty,
@@ -372,6 +385,14 @@ def main() -> None:
             )
             sys.exit(1)
         text = answer.text
+        eval_hallucinated = ""
+        eval_comment = ""
+        if evaluate_client is not None:
+            evaluation = evaluate_client.evaluate_row(
+                etalon=str(row[ETALON_COL]), ai_answer=text
+            )
+            eval_hallucinated = evaluation.get("hallucinated", "")
+            eval_comment = evaluation.get("comment", "")
         model = answer.meta.get("response_model")
         if model:
             if response_model and model != response_model:
@@ -392,6 +413,8 @@ def main() -> None:
             new_row[answer_col] = text
             if retrieval_col:
                 new_row[retrieval_col] = answer.meta.get("retrieval", "")
+            new_row[MARKUP_COLUMNS[0]] = eval_hallucinated
+            new_row[MARKUP_COLUMNS[1]] = eval_comment
             for col in MARKUP_COLUMNS:
                 new_row[col] = ""
             results_df = pd.concat([results_df, pd.DataFrame([new_row])], ignore_index=True)
@@ -401,6 +424,9 @@ def main() -> None:
             results_df.at[pos, answer_col] = text
             if retrieval_col:
                 results_df.at[pos, retrieval_col] = answer.meta.get("retrieval", "")
+            if evaluate_client is not None:
+                results_df.at[pos, MARKUP_COLUMNS[0]] = eval_hallucinated
+                results_df.at[pos, MARKUP_COLUMNS[1]] = eval_comment
 
         if answer.docs:
             append_retrieval(out_path, q_id, q_text, answer.docs)

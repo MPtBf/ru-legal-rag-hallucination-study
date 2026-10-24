@@ -57,6 +57,9 @@ CHUNK_OVERLAP = 150
 TOP_K = 5
 INDEX_VERSION = "v1"
 
+# Модель-судья для необязательной автоматической оценки ответов.
+EVALUATE_MODEL = "deepseek"
+
 
 def load_dataset() -> pd.DataFrame:
     return pd.read_excel(DATASET_PATH)
