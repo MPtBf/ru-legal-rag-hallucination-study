@@ -1,6 +1,8 @@
 """Индекс наивного RAG: чанки корпуса и Chroma на multilingual-e5-small."""
+import hashlib
 import json
 import logging
+from pathlib import Path
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -13,6 +15,24 @@ logger = logging.getLogger(__name__)
 
 # Имя коллекции = каталог data/index/: смена любой настройки даёт новый индекс.
 COLLECTION = f"naive_rag_e5small_{config.INDEX_VERSION}"
+
+
+def index_fingerprint() -> str:
+    """Fingerprint all inputs that determine persisted vectors and chunk IDs."""
+    digest = hashlib.sha256()
+    with open(config.CORPUS_PATH, "rb") as corpus:
+        for chunk in iter(lambda: corpus.read(1024 * 1024), b""):
+            digest.update(chunk)
+    settings = {
+        "embedding_model": config.EMBEDDING_MODEL,
+        "embedding_revision": config.EMBEDDING_REVISION,
+        "chunk_size": config.CHUNK_SIZE,
+        "chunk_overlap": config.CHUNK_OVERLAP,
+        "index_version": config.INDEX_VERSION,
+        "index_code_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
+    digest.update(json.dumps(settings, sort_keys=True).encode("utf-8"))
+    return digest.hexdigest()
 
 
 class E5Embeddings(Embeddings):
@@ -91,7 +111,7 @@ def build_chunks() -> list[Document]:
     return docs
 
 
-def _open_store() -> Chroma:
+def _open_store(fingerprint: str) -> Chroma:
     return Chroma(
         collection_name=COLLECTION,
         embedding_function=E5Embeddings(
@@ -104,23 +124,25 @@ def _open_store() -> Chroma:
         ),
         persist_directory=str(config.INDEX_DIR / COLLECTION),
         # Косинус, а не L2 по умолчанию: оценки сравнимы между прогонами.
-        collection_metadata={"hnsw:space": "cosine"},
+        collection_metadata={"hnsw:space": "cosine", "index_fingerprint": fingerprint},
     )
 
 
 def get_store() -> Chroma:
     """Открывает индекс; при расхождении с корпусом пересобирает."""
-    store = _open_store()
+    fingerprint = index_fingerprint()
+    store = _open_store(fingerprint)
     docs = build_chunks()
-    # Количество — единственный быстрый способ спросить Chroma о размере.
     actual = store._collection.count()
-    if actual != len(docs):
+    actual_fingerprint = (store._collection.metadata or {}).get("index_fingerprint")
+    if actual != len(docs) or actual_fingerprint != fingerprint:
         if actual:
             logger.warning(
-                "Индекс устарел: %d чанков вместо %d — пересборка", actual, len(docs)
+                "Индекс устарел (чанков %d/%d, fingerprint совпадает: %s) — пересборка",
+                actual, len(docs), actual_fingerprint == fingerprint,
             )
         store.delete_collection()
-        store = _open_store()
+        store = _open_store(fingerprint)
         ids = [
             f"{doc.metadata['article_id']}#{doc.metadata['chunk_index']}" for doc in docs
         ]

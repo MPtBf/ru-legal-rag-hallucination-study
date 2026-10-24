@@ -1,4 +1,5 @@
 """Наивный RAG: поиск по векторной базе, затем ответ модели по фрагментам."""
+import hashlib
 from typing import Any, Dict, List
 
 import config
@@ -33,6 +34,7 @@ class NaiveRagPipeline:
             "chunk_overlap": config.CHUNK_OVERLAP,
             "top_k": config.TOP_K,
             "index_version": config.INDEX_VERSION,
+            "corpus_sha256": hashlib.sha256(config.CORPUS_PATH.read_bytes()).hexdigest(),
         }
         self.store = get_store()
 
