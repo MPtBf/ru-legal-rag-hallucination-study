@@ -12,6 +12,8 @@ langchain-deepseek==1.1.1
 
 # Наивный RAG: эмбеддинги и векторная база
 # torch ставится CPU-сборкой: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Target interpreter: Python 3.10 (see .python-version).
+# Lock generation: python -m piptools compile --generate-hashes --output-file requirements-lock.txt requirements.txt
 torch==2.14.1
 sentence-transformers==6.2.0
 langchain-huggingface==1.2.3
