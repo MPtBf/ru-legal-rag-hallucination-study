@@ -30,6 +30,7 @@ CONDITION_FIELDS = [
     "prompt_version",
     "temperature",
     "answer_column",
+    "index",
 ]
 
 
@@ -78,6 +79,18 @@ def align_ids(source_df: pd.DataFrame, results_df: pd.DataFrame) -> int:
 
 def metadata_path(out_path: Path) -> Path:
     return out_path.with_name(out_path.stem + "_metadata.json")
+
+
+def retrieval_path(out_path: Path) -> Path:
+    """Полные тексты найденных чанков: в xlsx они не помещаются."""
+    return out_path.with_name(out_path.stem + "_retrieval.jsonl")
+
+
+def append_retrieval(out_path: Path, q_id: Any, question: str, docs: list) -> None:
+    """Одна строка JSON на вопрос: что нашёл ретривер и с каким счётом."""
+    record = {"id": q_id, "question": question, "fragments": docs}
+    with open(retrieval_path(out_path), "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def write_metadata(out_path: Path, meta: Dict[str, Any]) -> None:
@@ -205,6 +218,11 @@ def main() -> None:
     pipeline_cls = PIPELINES[args.mode]
     pipeline = pipeline_cls(model=args.model)
     answer_col = pipeline.answer_col
+    # RAG-режимы определяют свой системный промпт и версию; zero-shot берёт общие.
+    system_prompt = getattr(pipeline, "system_prompt", prompts.SYSTEM_PROMPT)
+    prompt_version = getattr(pipeline, "prompt_version", prompts.PROMPT_VERSION)
+    # Колонка с найденными статьями и JSONL с фрагментами — только у ретривера.
+    retrieval_col = getattr(pipeline, "retrieval_col", None)
 
     # --output-path (для тестов) или results/{mode}/{model}/{mode}_{model}_{prompt_version}.xlsx
     if args.output_path is not None:
@@ -216,7 +234,7 @@ def main() -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         # PROMPT_VERSION уже содержит префикс "v" (например "v1").
         # Даты в имени нет: прогон продолжается в том же файле и на следующий день.
-        fname = f"{args.mode}_{args.model}_{prompts.PROMPT_VERSION}.xlsx"
+        fname = f"{args.mode}_{args.model}_{prompt_version}.xlsx"
         out_path = out_dir / fname
 
     source_df = config.load_dataset()
@@ -227,6 +245,8 @@ def main() -> None:
     # Гарантируем, что нужные колонки есть даже у существующего файла.
     if answer_col not in results_df.columns:
         results_df[answer_col] = ""
+    if retrieval_col and retrieval_col not in results_df.columns:
+        results_df[retrieval_col] = ""
     for col in MARKUP_COLUMNS:
         if col not in results_df.columns:
             results_df[col] = ""
@@ -246,10 +266,12 @@ def main() -> None:
         "requested_model": pipeline.requested_model,
         "response_model": None,
         "system_fingerprint": None,
-        "prompt_version": prompts.PROMPT_VERSION,
-        "system_prompt": prompts.SYSTEM_PROMPT,
+        "prompt_version": prompt_version,
+        "system_prompt": system_prompt,
         "temperature": config.TEMPERATURE,
         "answer_column": answer_col,
+        # Параметры индекса: условия ретривера, None у zero-shot.
+        "index": getattr(pipeline, "index_conditions", None),
         "dataset_sha256": dataset_sha256(),
         "git_commit": commit,
         "git_dirty": dirty,
@@ -300,6 +322,11 @@ def main() -> None:
     if args.force and out_path.exists():
         clear_answers(results_df, answer_col)
         results_df.to_excel(out_path, index=False)
+        # JSONL с фрагментами перезапишем заново — старые строки не должны
+        # остаться рядом с ответами, сгенерированными заново.
+        r_path = retrieval_path(out_path)
+        if r_path.exists():
+            r_path.unlink()
         logger.info("--force: ответы очищены, прогон начнётся заново")
     elif existing_meta is not None:
         # Продолжение прогона: сохраняем накопленный провенанс и токены,
@@ -363,6 +390,8 @@ def main() -> None:
             # Вопроса ещё нет в файле результатов — добавляем строку.
             new_row = row.to_dict()
             new_row[answer_col] = text
+            if retrieval_col:
+                new_row[retrieval_col] = answer.meta.get("retrieval", "")
             for col in MARKUP_COLUMNS:
                 new_row[col] = ""
             results_df = pd.concat([results_df, pd.DataFrame([new_row])], ignore_index=True)
@@ -370,6 +399,11 @@ def main() -> None:
             index_by_question.setdefault(norm_question(q_text), pos)
         else:
             results_df.at[pos, answer_col] = text
+            if retrieval_col:
+                results_df.at[pos, retrieval_col] = answer.meta.get("retrieval", "")
+
+        if answer.docs:
+            append_retrieval(out_path, q_id, q_text, answer.docs)
 
         results_df.to_excel(out_path, index=False)
         processed += 1
