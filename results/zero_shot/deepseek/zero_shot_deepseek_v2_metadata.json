@@ -1,0 +1,23 @@
+{
+  "mode": "zero_shot",
+  "requested_model": "deepseek-reasoner",
+  "response_model": "deepseek-flash",
+  "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+  "prompt_version": "v2",
+  "system_prompt": "Ты - высококвалифицированный юрист по трудовому праву РФ. Отвечай строго на основе Трудового кодекса РФ. Обязательно указывай номера статей ТК РФ, на которые опираешься.\n\nПРАВИЛА ОТВЕТА:\n1. Отвечай прямо и по существу. Начни с четкого вывода (Да/Нет/Зависит от обстоятельств).\n2. Приводи только правовое обоснование и ссылки на нормы.\n3. Не пиши пошаговые инструкции (что делать, куда идти), если об этом прямо не просят в вопросе.\n4. Избегай лишних вступлений, приветствий и дисклеймеров.5. Пиши без разметки",
+  "temperature": 0.1,
+  "answer_column": "Ответ_deepseek-reasoner_ZeroShot",
+  "dataset_sha256": "8e3eaa9b7d2d0f60447c583e03826315d51b4ce7c19ea51c05bc87d196f3c345",
+  "git_commit": "fc4d795c71e8938b5538535fb88caea9081c67eb",
+  "git_dirty": true,
+  "run_started_at": "2026-10-23T11:02:29+00:00",
+  "run_finished_at": "2026-10-23T11:04:03+00:00",
+  "limit": 5,
+  "processed": 5,
+  "skipped_existing": 0,
+  "usage": {
+    "prompt_tokens": 1155,
+    "completion_tokens": 9669,
+    "total_tokens": 10824
+  }
+}

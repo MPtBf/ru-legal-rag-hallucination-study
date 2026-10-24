@@ -61,5 +61,11 @@ INDEX_VERSION = "v1"
 EVALUATE_MODEL = "deepseek"
 
 
-def load_dataset() -> pd.DataFrame:
-    return pd.read_excel(DATASET_PATH)
+def load_dataset(dataset_path: str | Path = DATASET_PATH) -> pd.DataFrame:
+    return pd.read_excel(dataset_path)
+
+
+# Совместимость для скриптов и исторических файлов результатов.
+allowed_giga_models = ["gigachat", "GigaChat", "GigaChat-2", "GigaChat-2-Pro", "GigaChat-2-Max", "GigaChat-Pro", "GigaChat-Max", "GigaChat-3-Ultra"]
+allowed_deepseek_models = ["deepseek", "deepseek-chat", "deepseek-reasoner"]
+allowed_models = allowed_giga_models + allowed_deepseek_models
