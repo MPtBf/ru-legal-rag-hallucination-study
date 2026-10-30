@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 
 import config
 from experiments import Answer, register_pipeline
-from experiments.naive_rag import prompts as rag_prompts
+import prompts
 from experiments.naive_rag.index import get_store
 from llm import create_llm
 
@@ -24,8 +24,8 @@ class NaiveRagPipeline:
         self.requested_model = cfg["api_model"]
         self.answer_col = f"{self.ANSWER_PREFIX}_{cfg['label']}_NaiveRAG"
         self.retrieval_col = f"Найденные статьи_{cfg['label']}_NaiveRAG"
-        self.system_prompt = rag_prompts.SYSTEM_PROMPT
-        self.prompt_version = rag_prompts.PROMPT_VERSION
+        self.system_prompt = prompts.RAG_SYSTEM_PROMPT
+        self.prompt_version = prompts.RAG_PROMPT_VERSION
         # Условия ретривера: попадают в метаданные и сравниваются при resume.
         self.index_conditions = {
             "embedding_model": config.EMBEDDING_MODEL,
@@ -73,9 +73,9 @@ class NaiveRagPipeline:
 
     def answer(self, question: str) -> Answer:
         fragments = self.retrieve(question)
-        prompt = rag_prompts.format_prompt(question, fragments)
+        prompt = prompts.format_rag_prompt(question, fragments)
         text = self.llm.generate_response(
-            prompt=prompt, system_prompt=rag_prompts.SYSTEM_PROMPT
+            prompt=prompt, system_prompt=prompts.RAG_SYSTEM_PROMPT
         )
         return Answer(
             text=text,
