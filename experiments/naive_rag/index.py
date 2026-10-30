@@ -60,6 +60,9 @@ def _load_corpus() -> list[dict]:
 
 def split_text(text: str, size: int, overlap: int) -> list[str]:
     """Нарезка по строкам с упаковкой до size; сверхдлинные строки режем вручную."""
+    if overlap >= size:
+        raise ValueError("CHUNK_OVERLAP должен быть меньше CHUNK_SIZE")
+
     segments = []
     for line in text.split("\n"):
         line = line.strip()

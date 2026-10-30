@@ -467,7 +467,11 @@ def main() -> None:
             eval_hallucinated = ""
             eval_comment = ""
             if evaluate_client is not None:
-                evaluation = evaluate_client.evaluate_row(etalon=str(row[ETALON_COL]), ai_answer=text)
+                evaluation = evaluate_client.evaluate_row(
+                    question=str(row[QUESTION_COL]),
+                    etalon=str(row[ETALON_COL]),
+                    ai_answer=text
+                )
                 eval_hallucinated = evaluation.get("hallucinated", "")
                 eval_comment = evaluation.get("comment", "")
             model = answer.meta.get("response_model")
