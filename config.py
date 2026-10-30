@@ -57,6 +57,15 @@ CHUNK_OVERLAP = 150
 TOP_K = 5
 INDEX_VERSION = "v1"
 
+# Настройки Hybrid RAG
+HYBRID_BM25_WEIGHT = 0.5
+HYBRID_VECTOR_WEIGHT = 0.5
+HYBRID_CANDIDATES_MULTIPLIER = 3
+
+# Реранкер, используем bge-reranker-base на CPU.
+RERANKER_MODEL = "BAAI/bge-reranker-base"
+RERANKER_TOP_N = 15
+
 # Модель-судья для необязательной автоматической оценки ответов.
 EVALUATE_MODEL = "deepseek"
 

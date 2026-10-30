@@ -25,3 +25,4 @@ class Answer:
 # Импорт подмодулей регистрирует пайплайны в реестре.
 import experiments.naive_rag  # noqa: E402,F401
 import experiments.zero_shot  # noqa: E402,F401
+import experiments.hybrid_rag
