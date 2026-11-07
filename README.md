@@ -1,6 +1,6 @@
 # Снижение галлюцинаций в русскоязычных юридических RAG-системах: систематическое сравнение гибридного, графового и агентного поиска
 
-Эксперименты по сравнению RAG-стратегий (naive → hybrid → graph) на русскоязычном трудовом праве РФ. Реализованы `zero_shot` и `naive_rag`; ответы можно оценивать автоматически LLM-судьёй с флагом `--evaluate`.
+Эксперименты по сравнению RAG-стратегий на русскоязычном трудовом праве РФ. Реализованы `zero_shot`, `naive_rag` и `hybrid_rag`; graph- и agentic-поиск пока не реализованы. Текущий рабочий план статьи включает все три режима; первоначальный бриф тимлида описывал сравнение только `zero_shot` и `naive_rag`, поэтому включение Hybrid RAG требует подтверждения команды. Ответы можно оценивать автоматически LLM-судьёй с флагом `--evaluate`.
 
 ## Установка
 
@@ -19,6 +19,7 @@ venv\Scripts\python -m pip install --extra-index-url https://download.pytorch.or
 venv\Scripts\python run.py --mode zero_shot --model gigachat
 venv\Scripts\python run.py --mode zero_shot --model deepseek
 venv\Scripts\python run.py --mode naive_rag --model gigachat
+venv\Scripts\python run.py --mode hybrid_rag --model gigachat
 venv\Scripts\python run.py --mode zero_shot --model deepseek --evaluate
 ```
 
@@ -61,6 +62,10 @@ venv\Scripts\python evaluate.py --model deepseek --file_path results\zero_shot\d
 
 Модель отвечает только по найденным фрагментам и ссылается на них `[1]`, `[2]`; при нехватке норм в контексте обязана ответить, что ответа в фрагментах нет. Рядом с таблицей результатов ложится `*_retrieval.jsonl` с полными текстами фрагментов и счетами — по нему считается recall@k. Колонка «Найденные статьи_*» — номера статей со счетами, для оценки поиска без чтения JSONL.
 
+## Гибридный RAG
+
+Реализован как отдельный режим `hybrid_rag`: BM25 и Chroma объединяются с весами 0.5/0.5, затем до 15 кандидатов переранжируются кросс-энкодером `BAAI/bge-reranker-base` на CPU и дедуплицируются до пяти статей. Параметры — `HYBRID_*` и `RERANKER_*` в `config.py`. По рабочему решению Марка от 07.11.2026 режим включается в статью как третий; это расширяет первоначальный бриф и требует подтверждения тимлида. Результаты сохранены в `results/hybrid_rag/`.
+
 ## Ошибки и повторы
 
 До 5 попыток на запрос: паузы 2, 4, 8, 16 с (или `Retry-After` от сервера), таймаут запроса 30 с. Повторяются только временные сбои (сеть, таймауты, 408, 429, 5xx), остальные завершают прогон сразу. Логи — в `logs/{mode}_{model}_{дата}.log`. Если попытки исчерпаны, скрипт выходит с кодом 1; полученные ответы уже сохранены и при перезапуске будут пропущены.
@@ -83,6 +88,7 @@ venv\Scripts\python evaluate.py --model deepseek --file_path results\zero_shot\d
 * `run.py` — единый раннер экспериментов
 * `experiments/zero_shot/` — `pipeline.py`; новый режим регистрируется через `@register_pipeline("имя")`
 * `experiments/naive_rag/` — `index.py` (чанкинг и Chroma), `prompts.py`, `pipeline.py`
+* `experiments/hybrid_rag/` — `pipeline.py` (BM25 + Chroma, затем реранкер)
 * `data/dataset.xlsx` — 211 кейсов с эталонными ответами и статьями ТК РФ
 * `data/corpus/tk_rf_articles.jsonl` — корпус статей ТК РФ (534 статьи)
 * `data/index/` — индекс RAG (не хранится в git)

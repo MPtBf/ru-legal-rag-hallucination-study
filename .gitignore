@@ -15,6 +15,7 @@ __pycache__/
 
 # Заметки
 temp.md
+.tmp/
 
 # Кэш индекса RAG
 data/index/
