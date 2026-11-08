@@ -44,4 +44,24 @@
 
 ## Фактические результаты
 
-Заполняется после завершения обоих прогонов: даты, длительности, usage, количество «да/нет», пути файлов и замеченные отклонения.
+Оба прогона выполнены 08.11.2026. Команды: `venv\Scripts\python run.py --mode zero_shot --model gigachat --evaluate` и `venv\Scripts\python run.py --mode zero_shot --model deepseek --evaluate`.
+
+| Модель | Файлы | Запуск (UTC) | Длительность | Ответов | Разметка «да/нет» | usage |
+|---|---|---|---|---|---|---|
+| GigaChat | `results/zero_shot/gigachat/zero_shot_gigachat_v2.xlsx` + `_metadata.json` + `_retrieval.jsonl` | 08.11.2026 11:58:54 → 12:07:05 | ~8 мин | 211/211 | 94 «да» / 117 «нет» | см. metadata |
+| DeepSeek | `results/zero_shot/deepseek/zero_shot_deepseek_v2.xlsx` + `_metadata.json` + `_retrieval.jsonl` | 08.11.2026 12:15:26 → 12:28:36 | ~13 мин | 211/211 | 25 «да» / 186 «нет» | prompt 44036 / completion 56539 / total 100575 |
+
+Проверки для обоих прогонов:
+
+- `run_status=succeeded`, `processed=211`, `skipped_existing=0`;
+- `prompt_version=v2`, `system_prompt` (510 символов) побайтово совпадает с текущим `prompts.SYSTEM_PROMPT`;
+- `evaluate_prompt` совпадает с `prompts.EVALUATE_PROMPT`, `evaluate_model=deepseek`, `temperature=0.1`;
+- хеши датасета `8e3eaa9b…` и корпуса `5dc526ad…` совпадают с RAG v2-прогонами;
+- `completed_ids` и `answer_provenance` — по 211 записей;
+- `response_model`: GigaChat `GigaChat-2:2.0.30.01`, DeepSeek `deepseek-flash`;
+- `git_dirty=false` (промпт v2 закоммичен до запусков): GigaChat — `a016cd1`, DeepSeek — `492a8b7`;
+- `_retrieval.jsonl` пуст (ожидаемо для zero-shot: retrieval-этапа нет).
+
+Замеченное отклонение: перед удалением старых файлов `api.giga.chat` был недоступен (TLS-handshake timeout / `CERTIFICATE_VERIFY_FAILED` у `requests` без `verify_ssl_certs=False`). В `llm/factory.py` для GigaChat уже задано `verify_ssl_certs=False`, поэтому сам эксперимент на это не влияет; инцидент внешний и в результаты не попал. Результаты RAG v2 и v3 не изменялись.
+
+Файлы закоммичены: GigaChat — `492a8b7`, DeepSeek — `ed7acb5`.
