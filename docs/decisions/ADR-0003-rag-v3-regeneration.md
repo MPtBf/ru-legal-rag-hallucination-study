@@ -1,7 +1,7 @@
 # ADR-0003: Перегенерация RAG-ответов на промпте v3
 
-**Дата:** 07.11.2026
-**Статус:** принято (решение участника проекта).
+**Дата:** 07–08.11.2026
+**Статус:** принято и выполнено (решение участника проекта).
 
 ## Контекст
 
@@ -35,4 +35,19 @@
 
 ## Фактические результаты
 
-Заполняется после завершения прогонов: даты, длительности, пути файлов и замеченные отклонения.
+Все четыре прогона завершены 07–08.11.2026. В каждом файле 211/211 ответов, 211/211 строк автоматической разметки, 211/211 строк retrieval provenance; `run_status=succeeded`, `prompt_version=v3`, `system_prompt` совпадает с текущим `RAG_SYSTEM_PROMPT`, хеши датасета и корпуса совпадают с зафиксированными в metadata.
+
+| Прогон | Файл | Период (UTC) | Разметка «да/нет» | usage (prompt/completion/total) | Коммит результатов |
+|---|---|---|---|---|---|
+| naive_rag / GigaChat | `results/naive_rag/gigachat/naive_rag_gigachat_v3.xlsx` | 07.11, 18:30:53–18:39:33 (8м40с) | 39 / 172 | 181884 / 16884 / 198768 | `7f65e8f` |
+| naive_rag / DeepSeek | `results/naive_rag/deepseek/naive_rag_deepseek_v3.xlsx` | 07.11, 18:40:11–18:52:12 (12м01с) | 22 / 189 | 284339 / 50349 / 334688 | `70814dc` |
+| hybrid_rag / GigaChat | `results/hybrid_rag/gigachat/hybrid_rag_gigachat_v3.xlsx` | 07.11 18:53 — 08.11 03:42 (с перезапусками) | 48 / 163 | последний сегмент: 180811 / 15792 / 196603 | `157ebc7` |
+| hybrid_rag / DeepSeek | `results/hybrid_rag/deepseek/hybrid_rag_deepseek_v3.xlsx` | 08.11, 03:43:22–04:46:25 (1ч03м) | 25 / 186 | 279401 / 47894 / 327295 | `b2e31c6` |
+
+Дополнительно:
+
+- Smoke-проверки на 3 вопросах прошли для `naive_rag/gigachat` и `hybrid_rag/deepseek`; временные файлы из `results/_test/` удалены.
+- `response_model` для GigaChat — `GigaChat-2:2.0.30.01`, для DeepSeek — `deepseek-flash` (запрошен `deepseek-chat`).
+- Прогон `hybrid_rag/gigachat` несколько раз прерывался сетевыми ошибками GigaChat (`ConnectTimeout` при TLS-handshake) и продолжался с места остановки. Metadata этого файла отражает только последний сегмент (`processed=38`, `skipped_existing=173`) и имеет `git_dirty=true`, потому что частичные файлы ещё не были закоммичены; суммарный usage по всем сегментам в metadata не сохранился.
+- Metadata остальных прогонов имеет `git_dirty=false`. Старые `*_v2.xlsx`, metadata и retrieval не изменялись.
+- Разметка «да/нет» получена автоматическим судьёй DeepSeek и не является человеческой разметкой.
