@@ -7,6 +7,7 @@
 ## Что лежит в репозитории
 
 - `results/annotations/annotations_v2.xlsx` — полная таблица: ответы моделей, итоговая метка, тег, комментарий разметчика, найденные статьи и два признака (`Эталонная статья в контексте`, `Отказ`).
+- `results/annotations/runs/` — шесть пофайловых таблиц v2 по 211 строк в исходной схеме (`Ответ_<Модель>_<Режим>`, без колонки `Прогон`); из них собран объединённый `annotations_v2.xlsx`.
 - `results/annotations/_итоги.tsv` — машиночитаемые агрегаты по шести прогонам.
 - `results/annotations/results_fig1.png` — рисунок 1 для раздела «Результаты».
 - `results/annotations/README.md` — краткая памятка по папке.
@@ -17,14 +18,17 @@
 ## Источники
 
 - `results/zero_shot/**/*_v2.xlsx`, `results/naive_rag/**/*_v2.xlsx`, `results/hybrid_rag/**/*_v2.xlsx` — шесть прогонов на промпте v2 (zero-shot от 08.11.2026, RAG от 31.10.2026).
-- `.tmp/форматированные-проверенные-ответы/` — промежуточные нормализованные таблицы, по которым собиралась разметка; в репозиторий не входят.
-- `.tmp/отказы-проверенные-ответы/` — рабочая папка сборки и аудита; в репозиторий не входит.
+- `.tmp/annotation_v0/` — исходные проверенные таблицы шести прогонов (10–12.11.2026), 310 меток «да»; теги в основном записаны в комментариях, схема не унифицирована. Не для итоговых чисел.
+- `.tmp/annotation_v1/` — нормализованные таблицы от 13.11.2026, 351 метка «да» (27,7 %); признаков `Эталонная статья в контексте` и `Отказ` ещё нет. Архив.
+- `.tmp/annotation_v2/` — финальная сборка и аудит (14–16.11.2026), 341 метка «да» (26,9 %), правило отказов; канон — `results/annotations/annotations_v2.xlsx`.
 - `data/dataset.xlsx` — 211 вопросов и эталонных ответов.
 - `data/corpus/tk_rf_articles.jsonl` — 534 статьи ТК РФ; происхождение и ограничения описаны в `docs/data/corpus-provenance.md`.
 
 ## Схема таблицы
 
 `Прогон, №, Глава, Вопрос, Ответ, Статья ТК РФ, Ссылка на источник, Ответ модели, Была галлюцинация (да/нет), Комментарий, Тип ошибки, Найденные статьи, Эталонная статья в контексте, Отказ`.
+
+В `runs/` схема та же, но без `Прогон`; колонки ответа и найденных статей названы `Ответ_<Модель>_<Режим>` и `Найденные статьи_<Модель>_<Режим>`. У zero-shot колонки найденных статей нет.
 
 - `Ответ модели` — ответ, сохранённый в `results/**/*_v2.xlsx`; скрипт проверки сверяет его построчно.
 - `Была галлюцинация (да/нет)` — итоговая метка после применения правила отказов.
@@ -69,6 +73,12 @@ SHA-256 зафиксированных файлов:
 | Файл | SHA-256 |
 |---|---|
 | `results/annotations/annotations_v2.xlsx` | `d51a8f40d75bdf598a44ca841bdf1e11696d125bf3d0047079c31f079ab30b37` |
+| `results/annotations/runs/zero_shot_gigachat_v2.xlsx` | `0792d27517288b0de31389e6d15a2d9949d6539e4c394c926675ac45585d727d` |
+| `results/annotations/runs/zero_shot_deepseek_v2.xlsx` | `7cadca668d8777515559c3d27185cf14452557877dfddd0cb99c021fd04aa738` |
+| `results/annotations/runs/naive_rag_gigachat_v2.xlsx` | `66b808b99893cfef2a7faf141dcf6a9b0ce1ba54a21a79e13b5fde79db5bc7e6` |
+| `results/annotations/runs/naive_rag_deepseek_v2.xlsx` | `da32468722fc44559f696a74c53fdd28a48c9e8372a2c18aa5b4c70d90f22a1f` |
+| `results/annotations/runs/hybrid_rag_gigachat_v2.xlsx` | `b16f15db0fb0add369848b6b02c7d89985ea6c0a6d89b0c0a026e1daf370f7cc` |
+| `results/annotations/runs/hybrid_rag_deepseek_v2.xlsx` | `7bd672e3955711d757c39baaf1de59b385729d6e8f17ddc653ba48479f92cce6` |
 | `results/annotations/_итоги.tsv` | `5bba57461d1e14189c81d2283855b4583da0eb2e06d5cca32a23ed976819db16` |
 | `data/dataset.xlsx` | `8e3eaa9b7d2d0f60447c583e03826315d51b4ce7c19ea51c05bc87d196f3c345` |
 | `results/zero_shot/gigachat/zero_shot_gigachat_v2.xlsx` | `96c282d055f0c92f463a9d8b290d992cfc6808f5da37344cca222c392048dc86` |
